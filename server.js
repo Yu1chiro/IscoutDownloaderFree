@@ -8,22 +8,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
-// Root endpoint
-app.get('/', async (req, res) => {
-    try {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    } catch (error) {
-        console.error('Error serving index:', error);
-        res.status(500).send('Internal Server Error');
-    }
+// Endpoint untuk halaman utama
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Scraping endpoint
+// Endpoint scraping dengan Cheerio
 app.post('/scrape', async (req, res) => {
     const { url } = req.body;
     
@@ -32,19 +27,14 @@ app.post('/scrape', async (req, res) => {
     }
     
     try {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        // Mengambil konten HTML dari URL
+        const response = await fetch(url);
         const html = await response.text();
+        
+        // Load HTML ke Cheerio
         const $ = cheerio.load(html);
         
+        // Mencari semua gambar dalam container yang ditentukan
         const imageUrls = [];
         $('section.px-sm-7.p-5.results_vcd2w picture.thumb_PdMgf img').each((i, element) => {
             const imageUrl = $(element).attr('src');
@@ -52,37 +42,20 @@ app.post('/scrape', async (req, res) => {
                 imageUrls.push(imageUrl);
             }
         });
-
-        if (imageUrls.length === 0) {
-            return res.status(404).json({ error: 'No images found' });
-        }
         
         res.json({ images: imageUrls });
     } catch (error) {
         console.error('Scraping error:', error);
-        res.status(500).json({ error: 'Failed to scrape images: ' + error.message });
+        res.status(500).json({ error: 'Failed to scrape images' });
     }
 });
 
-// Download endpoint
+// Endpoint untuk mengunduh gambar
 app.post('/download', async (req, res) => {
-    const { imageUrl } = req.body;
-    
-    if (!imageUrl) {
-        return res.status(400).json({ error: 'Image URL is required' });
-    }
-
     try {
-        const response = await fetch(imageUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        const { imageUrl } = req.body;
+        
+        const response = await fetch(imageUrl);
         const buffer = await response.buffer();
         
         res.setHeader('Content-Type', 'image/jpeg');
@@ -90,23 +63,9 @@ app.post('/download', async (req, res) => {
         res.send(buffer);
     } catch (error) {
         console.error('Download error:', error);
-        res.status(500).json({ error: 'Failed to download image: ' + error.message });
+        res.status(500).json({ error: 'Failed to download image' });
     }
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Something broke!' });
-});
-
-// For local development
-if (process.env.NODE_ENV !== 'production') {
-    const port = process.env.PORT || 3000;
-    app.listen(port, () => {
-        console.log(`Server running at http://localhost:${port}`);
-    });
-}
-
-// For Vercel
+// Export untuk Vercel
 export default app;
