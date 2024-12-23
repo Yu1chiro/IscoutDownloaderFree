@@ -8,8 +8,18 @@
     ],
     "routes": [
       {
+        "src": "/scrape",
+        "methods": ["POST"],
+        "dest": "/server.js"
+      },
+      {
+        "src": "/download",
+        "methods": ["POST"],
+        "dest": "/server.js"
+      },
+      {
         "src": "/(.*)",
-        "dest": "server.js"
+        "dest": "/server.js"
       }
     ]
   }
